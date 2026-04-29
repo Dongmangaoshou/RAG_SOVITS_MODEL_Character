@@ -1,0 +1,29 @@
+# 核心依赖
+python-dotenv>=1.0.0
+pyyaml>=6.0
+requests>=2.31.0
+
+# LangChain 生态
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-community>=0.3.0
+langchain-huggingface>=0.1.0
+langchain-text-splitters>=0.3.0
+langchain-core>=0.3.0
+
+# 向量检索 & 嵌入模型
+faiss-cpu>=1.8.0
+sentence-transformers>=2.7.0
+
+# 语音识别
+SpeechRecognition>=3.10.0
+PyAudio>=0.2.11
+
+# 音频播放
+pygame>=2.5.0
+
+# （可选）更好的音频播放回退
+# simpleaudio>=1.0.4
+
+# （可选）离线语音识别
+# faster-whisper>=1.0.0

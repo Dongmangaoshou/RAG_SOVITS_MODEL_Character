@@ -1,0 +1,15 @@
+{
+  "character_name": "雷姆",
+  "relationship_level": 0,
+  "messages": [
+    {
+      "type": "human",
+      "content": "你好"
+    },
+    {
+      "type": "ai",
+      "content": "雷姆是罗兹瓦尔大人的女仆 （稍稍欠身行礼）贵安，我是罗兹瓦尔宅邸的女仆雷姆。请问有什么需要帮忙的吗？(◡‿◡✿)"
+    }
+  ],
+  "timestamp": "20260429_093531"
+}

@@ -1,0 +1,41 @@
+# ============================================================
+# GPT-SoVITS 角色对话系统 — 用户配置文件
+# 复制此文件中的任何配置项即可覆盖 core/config.py 中的默认值
+# ============================================================
+
+# --- LLM 大语言模型 -------------------------------------------
+llm:
+  # provider: deepseek          # 可选: deepseek / openai / ollama
+  # base_url: https://api.deepseek.com
+  model: deepseek-v4-pro        # 模型名称
+  temperature: 0.75             # 生成随机性 (0=确定, 1=创造性)
+  max_retries: 3                # API 失败最大重试次数
+  retry_base_delay: 2           # 重试退避基础秒数
+
+# --- TTS 语音合成 ---------------------------------------------
+tts:
+  # 如果你没有部署 GPT-SoVITS 服务，将 enabled 设为 false
+  # 系统将自动以纯文本模式运行
+  enabled: true
+  api_url: http://127.0.0.1:9880
+  timeout: 60
+
+# --- 对话设置 -------------------------------------------------
+conversation:
+  memory_window: 10             # 保留最近 N 轮对话历史
+  save_dir: conversations       # 历史存档目录
+  auto_save: true               # 退出时自动保存
+
+# --- 情感关键词（可根据需要扩展）-------------------------------
+emotion_keywords:
+  depressed: [伤心, 绝望, 难过, 抑郁]
+  angry:    [生气, 愤怒, 烦躁, 不爽]
+  anxious:  [焦虑, 紧张, 担心, 害怕]
+
+# --- 关系系统 -------------------------------------------------
+relationship:
+  positive_keywords: [谢谢, 理解, 帮助, 开心, 喜欢]
+  close_threshold: 5            # 超过此值角色语气更亲近
+
+# --- 角色数据库路径 -------------------------------------------
+# character_db: character_database.json
