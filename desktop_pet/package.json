@@ -1,0 +1,19 @@
+{
+  "name": "character-desktop-pet",
+  "version": "0.1.0",
+  "description": "GPT-SoVITS 角色桌宠脚手架（Phase 4 起点）：Electron 透明窗口 + PixiJS 渲染 + Live2D 预留 + WebSocket 对接后端",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "keywords": [
+    "electron",
+    "pixijs",
+    "live2d",
+    "desktop-pet",
+    "gpt-sovits"
+  ],
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}

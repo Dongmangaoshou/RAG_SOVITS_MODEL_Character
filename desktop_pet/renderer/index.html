@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>角色桌宠</title>
+  <!-- 页面样式：全透明背景容器 + 半透明状态栏 -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 桌面宠物根容器（背景全透明，仅内容可见） -->
+  <div id="app">
+
+    <!--
+      PixiJS 画布挂载容器：
+      渲染进程 main.js 会把 PixiJS Application.view 挂到 #canvas 下，
+      后续 Live2D 模型（pixi-live2d-display）也渲染在同一个画布中。
+    -->
+    <div id="canvas"></div>
+
+    <!-- 加载状态提示（初始化 / 模型加载期间显示） -->
+    <div id="loading" class="overlay hidden">正在初始化桌宠…</div>
+
+    <!-- 错误提示（WebSocket 连接失败、模型加载失败等） -->
+    <div id="error" class="overlay hidden"></div>
+
+    <!--
+      底部状态栏（半透明）：
+       - 左侧：状态（thinking / speaking / idle）
+       - 右侧：当前情感（emotion + intensity）
+       emotion / state 消息由 WebSocket 驱动，由渲染进程写入此处。
+    -->
+    <div id="status-bar">
+      <span id="status-label">状态: idle</span>
+      <span id="emotion-label">情感: 平静</span>
+    </div>
+
+  </div>
+
+  <!-- 渲染进程入口脚本 -->
+  <script src="main.js"></script>
+</body>
+</html>
