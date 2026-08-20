@@ -293,9 +293,12 @@
     sending = true;
     el.sendBtn.disabled = true;
 
-    // 先尝试 SSE 流式；仅当完全未收到内容时才回退同步
+    // 先尝试 SSE 流式；若流式不可用/中断（如预览代理环境），回退同步接口补全完整回复
     const result = await streamChat(text);
-    if (result === "none") await syncChat(text);
+    if (result !== "ok") {
+      // partial: 复用已创建的部分气泡补全；none: 新建气泡
+      await syncChat(text, result === "partial");
+    }
 
     sending = false;
     el.sendBtn.disabled = false;
@@ -350,17 +353,17 @@
       saveLocalHistory();
       return gotToken ? "ok" : "none";
     } catch (e) {
+      // 流式中断（如预览代理 ERR_ABORTED）：已收到部分内容则复用补全，否则全量回退
       if (gotToken) {
         aiMsg && aiMsg.classList.remove("typing");
-        addMsg("system", "流式连接中断，已保留已生成内容");
-        if (autoTTS) playTTS(aiMsg && aiMsg.querySelector(".content") ? aiMsg.querySelector(".content").textContent : "");
+        addMsg("system", "流式连接中断，正在获取完整回复…");
         return "partial";
       }
       return "none";
     }
   }
 
-  async function syncChat(text) {
+  async function syncChat(text, reusePartial) {
     try {
       const r = await fetch(`${API_BASE}/v1/chat`, {
         method: "POST",
@@ -369,16 +372,35 @@
       });
       if (!r.ok) {
         const err = await r.json().catch(() => ({}));
-        addMsg("system", `后端错误: ${err.error || r.status}`);
+        if (!reusePartial) addMsg("system", `后端错误: ${err.error || r.status}`);
         return;
       }
       const d = await r.json();
-      const aiMsg = addMsg("ai", d.response || "（空回复）");
+      const reply = d.response || "（空回复）";
+
+      if (reusePartial) {
+        // 复用流式中断时已创建的部分气泡，补全为完整回复
+        const msgs = el.chatWindow.querySelectorAll(".msg.ai");
+        const last = msgs[msgs.length - 1];
+        if (last) {
+          const ta = last.querySelector(".content");
+          if (ta) {
+            ta.textContent = reply;
+            last.classList.remove("typing");
+          } else {
+            addMsg("ai", reply);
+          }
+        } else {
+          addMsg("ai", reply);
+        }
+      } else {
+        addMsg("ai", reply);
+      }
       if (d.emotion) el.emotionState.textContent = d.emotion;
-      if (autoTTS) playTTS(d.response || "");
+      if (autoTTS) playTTS(reply);
       saveLocalHistory();
     } catch {
-      addMsg("system", "无法连接后端，请先运行 python api/main.py");
+      if (!reusePartial) addMsg("system", "无法连接后端，请先运行 python api/main.py");
     }
     scrollBottom();
   }
