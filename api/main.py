@@ -456,6 +456,23 @@ if _FASTAPI_AVAILABLE:
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=500)
 
+    # -- 记忆：列出 / 清空 / 删除 -----------------------------------
+    @app.delete("/v1/memory/{character}/all")
+    async def clear_memory(character: str):
+        """清空指定角色的全部记忆（隐私需求）"""
+        try:
+            if not _CORE_AVAILABLE:
+                return JSONResponse(
+                    {"error": f"核心模块导入失败: {_CORE_IMPORT_ERROR}"}, status_code=503
+                )
+            mem = await asyncio.to_thread(_get_memory, character)
+            await asyncio.to_thread(mem.clear_all)
+            return {"cleared": True, "character": character}
+        except ServiceUnavailableError as e:
+            return JSONResponse({"error": str(e)}, status_code=503)
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+
     @app.delete("/v1/memory/{character}/{event_id}")
     async def delete_memory(character: str, event_id: int):
         """删除指定角色的某条记忆事件"""
@@ -467,6 +484,98 @@ if _FASTAPI_AVAILABLE:
             mem = await asyncio.to_thread(_get_memory, character)
             await asyncio.to_thread(mem.delete_event, event_id)
             return {"deleted": event_id, "character": character}
+        except ServiceUnavailableError as e:
+            return JSONResponse({"error": str(e)}, status_code=503)
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+    # -- 角色信息 / 画像 ---------------------------------------------
+    @app.get("/v1/character/{character}")
+    async def character_info(character: str):
+        """返回角色详情（来源/性格/风格/背景故事/经典台词）"""
+        try:
+            if not _CORE_AVAILABLE:
+                return JSONResponse(
+                    {"error": f"核心模块导入失败: {_CORE_IMPORT_ERROR}"}, status_code=503
+                )
+            profile = await asyncio.to_thread(CharacterProfile, character)
+            data = profile.data
+            return {
+                "name": character,
+                "source": data.get("source", ""),
+                "personality": data.get("personality", ""),
+                "style": data.get("style", ""),
+                "backstory": data.get("backstory", ""),
+                "catchphrases": data.get("catchphrases", [])[:5],
+                "emotion_style": data.get("emotion_style", {}),
+            }
+        except KeyError:
+            return JSONResponse({"error": f"角色不存在: {character}"}, status_code=404)
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+    @app.get("/v1/memory/{character}/profile")
+    async def memory_profile(character: str):
+        """返回用户画像（偏好/回避话题/性格观察/关心事项）"""
+        try:
+            if not _CORE_AVAILABLE:
+                return JSONResponse(
+                    {"error": f"核心模块导入失败: {_CORE_IMPORT_ERROR}"}, status_code=503
+                )
+            mem = await asyncio.to_thread(_get_memory, character)
+            profile = await asyncio.to_thread(mem.get_profile)
+            return {"character": character, "profile": profile}
+        except ServiceUnavailableError as e:
+            return JSONResponse({"error": str(e)}, status_code=503)
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+    # -- 情感控制 -----------------------------------------------------
+    @app.post("/v1/emotion/{character}/reset")
+    async def reset_emotion(character: str):
+        """重置角色情感状态为平静"""
+        try:
+            fsm = _get_emotion_fsm(character)
+            if fsm is None:
+                return JSONResponse(
+                    {"error": "EmotionFSM 不可用"}, status_code=503
+                )
+            reset = getattr(fsm, "reset", None)
+            if callable(reset):
+                await asyncio.to_thread(reset)
+            return {"reset": True, "character": character, "emotion": "平静"}
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+
+    # -- TTS 合成（供前端语音播放） ------------------------------------
+    @app.post("/v1/tts")
+    async def synthesize_tts(payload: dict):
+        """合成单段语音：{"character","text"} -> 音频流（wav）
+        若 TTS 服务不可用返回 503"""
+        try:
+            character = str(payload.get("character") or DEFAULT_CHARACTER)
+            text = str(payload.get("text") or "").strip()
+            if not text:
+                return JSONResponse({"error": "缺少 text 字段"}, status_code=400)
+            if not _CORE_AVAILABLE:
+                return JSONResponse(
+                    {"error": f"核心模块导入失败: {_CORE_IMPORT_ERROR}"}, status_code=503
+                )
+            system = await asyncio.to_thread(_get_system, character)
+            tts = _get_tts()
+            if not await asyncio.to_thread(tts.is_available):
+                return JSONResponse({"error": "TTS 服务未运行"}, status_code=503)
+            emotion, intensity = _detect_emotion(character, text)
+            ref_path, ref_text = _resolve_emotion_audio(character, system.profile,
+                                                        emotion, intensity)
+            wav_path = await asyncio.to_thread(
+                tts.synthesize_to_path, system.profile, text,
+                ref_path, ref_text,
+            )
+            if not wav_path:
+                return JSONResponse({"error": "语音合成失败"}, status_code=502)
+            from fastapi.responses import FileResponse
+            return FileResponse(wav_path, media_type="audio/wav")
         except ServiceUnavailableError as e:
             return JSONResponse({"error": str(e)}, status_code=503)
         except Exception as e:
