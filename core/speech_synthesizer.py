@@ -104,25 +104,55 @@ class SpeechSynthesizer:
         except Exception as e:
             print(f" 播放失败: {e}")
 
+    def _resolve_tts_url(self) -> str:
+        """返回 GPT-SoVITS /tts 端点 URL（兼容配置中带/不带路径）"""
+        base = CONFIG["tts"].get("api_url", "http://127.0.0.1:9880").rstrip("/")
+        if base.endswith("/tts"):
+            return base
+        return base + "/tts"
+
+    def _resolve_ref_audio(self, profile: CharacterProfile,
+                           refer_wav_path: str, prompt_text: str):
+        """解析参考音频路径与提示文本：
+        - 若调用方显式传入（已由 EmotionAudioMatcher 解析）则直接使用
+        - 否则从角色配置解析，并替换 {emotion} 占位符"""
+        if refer_wav_path and "{emotion}" not in refer_wav_path:
+            return refer_wav_path, prompt_text
+        # 尝试按情感解析（默认平静）
+        try:
+            return profile.resolve_emotion_audio("平静")
+        except Exception:
+            return profile.refer_wav_path, profile.prompt_text
+
+    def _build_payload(self, profile: CharacterProfile, text: str,
+                       ref_path: str, ref_text: str) -> dict:
+        """按 GPT-SoVITS api_v2.py 新版参数契约构建请求体。
+        注意：sovits_path/gpt_path 由服务端 tts_infer.yaml 管理，不再传。"""
+        return {
+            "text": text,
+            "text_lang": "zh",
+            "ref_audio_path": ref_path,
+            "prompt_lang": "ja",
+            "prompt_text": ref_text,
+            "text_split_method": "cut5",
+            "batch_size": 1,
+            "media_type": "wav",
+            "streaming_mode": False,
+            "top_k": 5,
+            "top_p": 1,
+            "temperature": 1,
+        }
+
     def synthesize(self, profile: CharacterProfile, text: str,
                    refer_wav_path: str = "", prompt_text: str = "") -> bool:
         """合成语音 → ffmpeg 格式修复 → 播放"""
-        ref_path = refer_wav_path or profile.refer_wav_path
-        ref_text = prompt_text or profile.prompt_text
-        payload = {
-            "sovits_path": profile.sovits_path,
-            "gpt_path": profile.gpt_path,
-            "refer_wav_path": ref_path,
-            "prompt_text": ref_text,
-            "prompt_language": "ja",
-            "text": text,
-            "text_language": "zh",
-            "media_type": "wav",
-        }
+        ref_path, ref_text = self._resolve_ref_audio(
+            profile, refer_wav_path, prompt_text)
+        payload = self._build_payload(profile, text, ref_path, ref_text)
 
         try:
             print("正在合成语音...", end="", flush=True)
-            resp = requests.post(CONFIG["tts"]["api_url"], json=payload,
+            resp = requests.post(self._resolve_tts_url(), json=payload,
                                  timeout=CONFIG["tts"]["timeout"])
             if resp.status_code != 200:
                 print(f" API错误 {resp.status_code}")
@@ -150,20 +180,11 @@ class SpeechSynthesizer:
     def synthesize_to_path(self, profile: CharacterProfile, text: str,
                            refer_wav_path: str = "", prompt_text: str = "") -> str | None:
         """合成语音 → ffmpeg 格式修复 → 返回路径（供 WebUI 使用）"""
-        ref_path = refer_wav_path or profile.refer_wav_path
-        ref_text = prompt_text or profile.prompt_text
-        payload = {
-            "sovits_path": profile.sovits_path,
-            "gpt_path": profile.gpt_path,
-            "refer_wav_path": ref_path,
-            "prompt_text": ref_text,
-            "prompt_language": "ja",
-            "text": text,
-            "text_language": "zh",
-            "media_type": "wav",
-        }
+        ref_path, ref_text = self._resolve_ref_audio(
+            profile, refer_wav_path, prompt_text)
+        payload = self._build_payload(profile, text, ref_path, ref_text)
         try:
-            resp = requests.post(CONFIG["tts"]["api_url"], json=payload,
+            resp = requests.post(self._resolve_tts_url(), json=payload,
                                  timeout=CONFIG["tts"]["timeout"])
             if resp.status_code != 200:
                 return None
