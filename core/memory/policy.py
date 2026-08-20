@@ -26,6 +26,12 @@ class MemoryInjectionPolicy:
         budget = budget or self.token_budget
         blocks = []
 
+        # 关系状态实时刷新（避免缓存旧值）
+        try:
+            self.relationship.load()
+        except Exception:
+            pass
+
         def _append(title: str, body: str, est: int) -> bool:
             if not body.strip():
                 return True

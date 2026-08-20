@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>虚拟角色对话系统 V2</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== 左侧边栏 ===== -->
+  <aside class="sidebar">
+    <div class="logo">
+      <h1>角色对话</h1>
+      <span class="ver">V2</span>
+    </div>
+
+    <div class="panel char-panel">
+      <label class="panel-title">选择角色</label>
+      <select id="charSelect" class="select"></select>
+      <div id="charInfo" class="char-info"></div>
+    </div>
+
+    <div class="panel state-panel">
+      <label class="panel-title">角色状态</label>
+      <div class="state-row">
+        <span class="state-label">情感</span>
+        <span id="emotionState" class="state-value">—</span>
+      </div>
+      <div class="state-row">
+        <span class="state-label">强度</span>
+        <div class="meter"><div id="emotionBar" class="meter-fill"></div></div>
+      </div>
+      <div class="state-row">
+        <span class="state-label">关系</span>
+        <span id="relState" class="state-value">—</span>
+      </div>
+      <div class="state-row">
+        <span class="state-label">表情</span>
+        <span id="exprState" class="state-value">—</span>
+      </div>
+    </div>
+
+    <div class="panel mem-panel">
+      <label class="panel-title">角色记忆</label>
+      <div id="memList" class="mem-list">
+        <div class="mem-empty">暂无记忆</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== 主对话区 ===== -->
+  <main class="chat-area">
+    <div id="chatWindow" class="chat-window"></div>
+
+    <div class="input-bar">
+      <textarea id="inputBox" class="input-box" rows="1"
+        placeholder="对角色说点什么…（Enter 发送，Shift+Enter 换行）"></textarea>
+      <button id="sendBtn" class="send-btn">发送</button>
+    </div>
+    <div class="input-hint">
+      <span id="connState" class="conn-badge">连接检测中…</span>
+      <span class="hint-text">V2：长期记忆 · 情感智能 · 低延迟</span>
+    </div>
+  </main>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 """记忆数据库连接管理 —— 轻量 SQLite 封装，线程安全"""
+import os
 import sqlite3
 import threading
 from pathlib import Path
@@ -9,7 +10,14 @@ _lock = threading.Lock()
 
 
 def get_db_path() -> Path:
-    """返回记忆库路径（config.memory.sqlite_path 或默认 data/memory.db）"""
+    """返回记忆库路径：
+    1. 环境变量 MEMORY_DB_PATH 优先（便于测试/多实例隔离）
+    2. 否则 config.memory.sqlite_path 或默认 data/memory.db"""
+    env_path = os.environ.get("MEMORY_DB_PATH", "").strip()
+    if env_path:
+        p = Path(env_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
     cfg_path = CONFIG.get("memory", {}).get("sqlite_path", "data/memory.db")
     p = Path(cfg_path)
     if not p.is_absolute():

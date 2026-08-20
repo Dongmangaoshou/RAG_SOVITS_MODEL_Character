@@ -28,7 +28,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 import threading
+from pathlib import Path
+
+# ---- 项目根路径注入（支持 `python api/main.py` 与 `python -m api.main` 两种启动）-----
+_THIS_DIR = Path(__file__).resolve().parent          # .../api
+_PROJECT_ROOT = _THIS_DIR.parent                      # 项目根目录
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 # ---- 可选依赖：FastAPI / uvicorn（缺失则降级提示） ------------------
 try:
@@ -422,7 +430,7 @@ if _FASTAPI_AVAILABLE:
     # -- 记忆：列出 / 删除 -----------------------------------------
     @app.get("/v1/memory/{character}")
     async def list_memory(character: str, limit: int = MEMORY_LIST_LIMIT):
-        """列出指定角色的记忆事件"""
+        """列出指定角色的记忆事件（含关系状态）"""
         try:
             if not _CORE_AVAILABLE:
                 return JSONResponse(
@@ -431,7 +439,13 @@ if _FASTAPI_AVAILABLE:
             mem = await asyncio.to_thread(_get_memory, character)
             limit = max(1, min(int(limit), MEMORY_LIST_LIMIT_MAX))
             events = await asyncio.to_thread(mem.list_events, limit)
-            return {"character": character, "events": events}
+            relationship = None
+            try:
+                relationship = mem.get_relationship()
+            except Exception:
+                pass
+            return {"character": character, "events": events,
+                    "relationship": relationship}
         except ServiceUnavailableError as e:
             return JSONResponse({"error": str(e)}, status_code=503)
         except Exception as e:
@@ -469,7 +483,22 @@ if _FASTAPI_AVAILABLE:
                 or DEFAULT_EMOTION
             )
             intensity = float(getattr(fsm, "intensity", 0.0) or 0.0)
-            return {"character": character, "emotion": state, "intensity": intensity}
+            # EI v2 输出表情名（Live2D 用）
+            expression = ""
+            try:
+                expression = str(getattr(fsm, "state", "") or "")
+            except Exception:
+                pass
+            hint = ""
+            try:
+                res = fsm._result()
+                expression = res.get("expression", "")
+                hint = res.get("hint", "")
+            except Exception:
+                pass
+            return {"character": character, "emotion": state,
+                    "intensity": intensity, "expression": expression,
+                    "hint": hint}
         except Exception as e:
             return JSONResponse({"error": str(e)}, status_code=500)
 
@@ -578,6 +607,19 @@ async def _ws_handle_chat(websocket: WebSocket, msg: dict, interrupt: threading.
     await websocket.send_json({WS_MSG_STATE: WS_STATE_IDLE})
 
 
+# ---- 前端静态页面挂载（必须在所有 API 路由注册之后，避免拦截 /v1/*） -----
+if _FASTAPI_AVAILABLE and app is not None:
+    try:
+        from fastapi.staticfiles import StaticFiles
+        from pathlib import Path as _Path
+        _web_root = _Path(__file__).resolve().parent.parent / "webui_v2"
+        if _web_root.is_dir():
+            app.mount("/", StaticFiles(directory=str(_web_root), html=True), name="webui")
+            print(f"[WEB] 前端目录: {_web_root}")
+    except Exception as _e:
+        print(f"[警告] 前端挂载失败: {_e}")
+
+
 # ---- 启动入口 ------------------------------------------------------
 if __name__ == "__main__":
     if not _FASTAPI_AVAILABLE:
@@ -590,4 +632,5 @@ if __name__ == "__main__":
     host = str(_latency_cfg("host", DEFAULT_HOST))
     port = int(_latency_cfg("port", DEFAULT_PORT))
     print(f"[API] 启动于 http://{host}:{port}   (接口文档: http://{host}:{port}/docs)")
+    print(f"[WEB] 前端页面: http://{host}:{port}/")
     uvicorn.run(app, host=host, port=port)
