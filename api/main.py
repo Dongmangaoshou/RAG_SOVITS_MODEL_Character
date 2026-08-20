@@ -421,6 +421,11 @@ if _FASTAPI_AVAILABLE:
             return StreamingResponse(
                 _sse_generator(system, text),
                 media_type=SSE_MEDIA_TYPE,
+                headers={
+                    "Cache-Control": "no-cache, no-transform",
+                    "X-Accel-Buffering": "no",
+                    "Connection": "keep-alive",
+                },
             )
         except ServiceUnavailableError as e:
             return JSONResponse({"error": str(e)}, status_code=503)

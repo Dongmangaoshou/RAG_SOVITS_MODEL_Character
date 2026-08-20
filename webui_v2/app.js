@@ -154,9 +154,9 @@
     sending = true;
     el.sendBtn.disabled = true;
 
-    // 先尝试 SSE 流式；失败则回退同步
-    const ok = await streamChat(text);
-    if (!ok) await syncChat(text);
+    // 先尝试 SSE 流式；仅当完全未收到内容时才回退同步
+    const result = await streamChat(text);
+    if (result === "none") await syncChat(text);
 
     sending = false;
     el.sendBtn.disabled = false;
@@ -164,14 +164,15 @@
   }
 
   async function streamChat(text) {
+    let gotToken = false;
     try {
       const r = await fetch(`${API_BASE}/v1/chat/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ character: currentChar, text }),
       });
-      if (!r.ok) return false;
-      if (!r.body) return false;
+      if (!r.ok) return "none";
+      if (!r.body) return "none";
 
       const aiMsg = addMsg("ai", "");
       const ta = aiMsg.querySelector(".content");
@@ -192,6 +193,7 @@
           try {
             const obj = JSON.parse(payload);
             if (obj.token) {
+              gotToken = true;
               ta.textContent += obj.token;
               aiMsg.classList.add("typing");
               scrollBottom();
@@ -204,9 +206,15 @@
       }
       aiMsg.classList.remove("typing");
       scrollBottom();
-      return true;
-    } catch {
-      return false;
+      return gotToken ? "ok" : "none";
+    } catch (e) {
+      // 连接中断（如 ERR_ABORTED）：若已收到部分内容则保留，否则回退同步
+      if (gotToken) {
+        aiMsg && aiMsg.classList.remove("typing");
+        addMsg("system", "流式连接中断，已保留已生成内容");
+        return "partial";
+      }
+      return "none";
     }
   }
 

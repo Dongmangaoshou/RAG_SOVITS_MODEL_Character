@@ -1,3 +1,4 @@
+import socket
 import subprocess
 import time
 import requests
@@ -10,6 +11,8 @@ from core.character_profile import CharacterProfile
 class SpeechSynthesizer:
     """语音合成 —— 调用 GPT-SoVITS API 生成语音并播放"""
 
+    _availability_cache: dict = {}   # api_url -> (available, checked_at)
+
     def __init__(self):
         self._enabled = CONFIG["tts"]["enabled"]
 
@@ -19,6 +22,26 @@ class SpeechSynthesizer:
 
     def disable(self):
         self._enabled = False
+
+    def is_available(self, timeout: float = 0.8, cache_ttl: float = 5.0) -> bool:
+        """快速探测 TTS 服务是否可连接（socket 握手，不发起真实合成）。
+        结果带 5 秒缓存，避免频繁探测。"""
+        api_url = CONFIG["tts"].get("api_url", "http://127.0.0.1:9880")
+        now = time.time()
+        cached = self._availability_cache.get(api_url)
+        if cached and now - cached[1] < cache_ttl:
+            return cached[0]
+        available = False
+        try:
+            from urllib.parse import urlparse
+            u = urlparse(api_url)
+            host, port = u.hostname or "127.0.0.1", u.port or 9880
+            with socket.create_connection((host, port), timeout=timeout):
+                available = True
+        except Exception:
+            available = False
+        self._availability_cache[api_url] = (available, now)
+        return available
 
     @staticmethod
     def _fix_audio(filepath):

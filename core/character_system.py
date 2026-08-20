@@ -271,15 +271,27 @@ class AdvancedCharacterSystem:
         self.memory.save_context(user_input, final)
         self._save_v2_memory(user_input, final)
 
-        # 尝试合成语音
+        # 尝试合成语音（先快速探测 TTS 服务，不可用立即跳过，避免阻塞流式连接）
         audio_path = None
         status = ""
         if self.tts.enabled:
-            ref_path, ref_text = self._resolve_audio()
-            audio_path = self.tts.synthesize_to_path(
-                self.profile, re.sub(r'\([^)]*\)', '', final),
-                refer_wav_path=ref_path, prompt_text=ref_text)
-            status = "✓ 语音已合成" if audio_path else "✗ 语音合成失败"
+            tts_ok = False
+            try:
+                tts_ok = self.tts.is_available()
+            except Exception:
+                tts_ok = False
+            if tts_ok:
+                try:
+                    ref_path, ref_text = self._resolve_audio()
+                    audio_path = self.tts.synthesize_to_path(
+                        self.profile, re.sub(r'\([^)]*\)', '', final),
+                        refer_wav_path=ref_path, prompt_text=ref_text)
+                    status = "✓ 语音已合成" if audio_path else "✗ 语音合成失败"
+                except Exception:
+                    audio_path = None
+                    status = "✗ 语音合成失败"
+            else:
+                status = "✗ TTS 服务未运行（仅文本）"
 
         yield final, audio_path, status
 
